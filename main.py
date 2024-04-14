@@ -41,7 +41,7 @@ def main():
     result = {}
     notFound = {}
 
-    with open("output.json", 'r') as openFile:
+    with open("map.json", 'r') as openFile:
         result = json.load(openFile)
 
     with open("notfound.json", "r") as openFile:
@@ -110,7 +110,7 @@ def main():
 
             
     except Exception as e:
-        with open("output.json", "w") as outfile:
+        with open("map.json", "w") as outfile:
             json.dump(result, outfile, indent=4)
 
         with open("notfound.json", "w") as outfile:
@@ -118,7 +118,7 @@ def main():
 
         raise e
         
-    with open("output.json", "w") as outfile:
+    with open("map.json", "w") as outfile:
         json.dump(result, outfile, indent=4)
 
     with open("notfound.json", "w") as outfile:

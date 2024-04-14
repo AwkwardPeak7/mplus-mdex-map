@@ -33,7 +33,7 @@ def main():
     flagged = {}
     result = {}
 
-    with open("output.json", 'r') as openFile:
+    with open("map.json", 'r') as openFile:
         result = json.load(openFile)
 
     with open("notfound.json", "r") as openFile:
