@@ -66,7 +66,7 @@ def main():
                 print(f"{mpTitleId} was not found last time, bailing")
                 continue
 
-            mdr = MangaDexRequest("/manga", {"title":title["theTitle"]})
+            mdr = MangaDexRequest("/manga", {"title":title["theTitle"], "limit":"1"})
             found = False
             for manga in mdr:
                 links = manga["attributes"].get("links")
@@ -98,17 +98,17 @@ def main():
                             for t in title["titles"]:
                                 result[t["titleId"]] = manga["id"]
                             break
-                    
+
                     if found:
                         break
-                
+
                 time.sleep(2)
 
             if found == False:
                 notFound[mpTitleId] = title["theTitle"]
                 print(f"Warning: {title["theTitle"]} not found, bailing")
 
-            
+
     except Exception as e:
         with open("map.json", "w") as outfile:
             json.dump(result, outfile, indent=4)
@@ -117,7 +117,7 @@ def main():
             json.dump(notFound, outfile, indent=4)
 
         raise e
-        
+
     with open("map.json", "w") as outfile:
         json.dump(result, outfile, indent=4)
 
