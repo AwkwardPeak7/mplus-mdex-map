@@ -1,7 +1,6 @@
 import json
 import requests
 from urllib.parse import urlparse
-import os.path
 import time
 import logging
 
@@ -123,11 +122,6 @@ def main():
 
     with open("notfound.json", "w") as outfile:
         json.dump(notFound, outfile, indent=4)
-
-
-
-
-
 
 if (__name__ == "__main__"):
     main()
