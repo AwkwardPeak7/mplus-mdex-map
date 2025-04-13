@@ -2,7 +2,6 @@ import json
 import requests
 from urllib.parse import urlparse
 import time
-import logging
 
 mangaPlusApi = "https://jumpg-webapi.tokyo-cdn.com/api"
 mangadexApi = "https://api.mangadex.org"
@@ -22,90 +21,106 @@ def MangaDexRequest(endpoint, params):
 
     return respomse.json()["data"]
 
-def AnilistReq(id):
+def AnilistReq(ids):
     url = "https://graphql.anilist.co"
+    
     payload = {
-        "query": "query($_id: Int) { Media(id: $_id) { externalLinks { url } } }",
-        "variables": {"_id": id }
+        "query": "query ($ids: [Int]) { Page(perPage: 50) { media(id_in: $ids, type: MANGA) { id externalLinks { url }}}}",
+        "variables": {"ids": ids }
     }
     resp = requests.post(url, json=payload)
 
     return resp.json()["data"]
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
-
     allTitles = MangaPlusRequest("/title_list/allV2", {})["allTitlesViewV2"]["AllTitlesGroup"]
 
     result = {}
     notFound = {}
 
-    with open("map.json", 'r') as openFile:
-        result = json.load(openFile)
+    try:
+        with open("map.json", 'r') as openFile:
+            result = json.load(openFile)
+    except FileNotFoundError:
+        result = {}
 
-    with open("notfound.json", "r") as openFile:
-        notFound = json.load(openFile)
+    try:
+        with open("notfound.json", "r") as openFile:
+            notFound = json.load(openFile)
+    except FileNotFoundError:
+        notFound = {}
 
     try:
         for title in allTitles:
             mpTitleId = title["titles"][0]["titleId"]
             if str(mpTitleId) in result:
-                print(f"{mpTitleId} already exists in file, bailing")
+                #print(f"SKIP: {mpTitleId}")
                 for t in title["titles"]:
                     if str(t["titleId"]) in result:
                         continue
                     result[t["titleId"]] = result[str(mpTitleId)]
-                    print("\talso fixed missing other lang keys ;)")
+                    #print(f"INFO: {mpTitleId}: fixed missing other lang keys")
                 if str(mpTitleId) in notFound:
                     del notFound[str(mpTitleId)]
-                    print("\talso removed it from notfound :D")
+                    #print(f"INFO: {mpTitleId}: removed from notfound")
                 continue
 
             if str(mpTitleId) in notFound:
-                print(f"{mpTitleId} was not found last time, bailing")
+                print(f"WARN: {mpTitleId} was not found last time, skipping")
                 continue
 
-            mdr = MangaDexRequest("/manga", {"title":title["theTitle"], "limit":"1"})
+            mdr = MangaDexRequest("/manga", {"title":title["theTitle"], "limit": 25})
+            alIds = {}
+
             found = False
             for manga in mdr:
                 links = manga["attributes"].get("links")
                 if links == None:
                     continue
 
-                link1 = links.get("engtl", "https://127.0.0.1/not-real")
-                url1 = urlparse(link1)
+                tl = []
 
-                link2 = links.get("raw", "https://127.0.0.1/not-real")
-                url2 = urlparse(link2)
+                if "engtl" in links:
+                    tl.append(urlparse(links["engtl"]))
+                if "raw" in links:
+                    tl.append(urlparse(links["raw"]))
 
-                if (url1.hostname == "mangaplus.shueisha.co.jp" and int(link1.split("/")[-1]) == int(mpTitleId)) or (url2.hostname == "mangaplus.shueisha.co.jp" and int(link2.split("/")[-1]) == int(mpTitleId)):
-                    found=True
-                    print(mpTitleId, "->", manga["id"])
-                    for t in title["titles"]:
-                        result[t["titleId"]] = manga["id"]
-                    break
-                else:
-                    al = links.get("al")
-                    if al == None:
-                        continue
-                    alr = AnilistReq(al)["Media"]["externalLinks"]
-                    for lnk in alr:
-                        url3 = urlparse(lnk["url"])
-                        if (url3.hostname == "mangaplus.shueisha.co.jp" and int(lnk["url"].split("/")[-1]) == int(mpTitleId)):
-                            found=True
-                            print(mpTitleId, "->", manga["id"])
-                            for t in title["titles"]:
-                                result[t["titleId"]] = manga["id"]
-                            break
-
-                    if found:
+                for link in tl:
+                    if (link.hostname == "mangaplus.shueisha.co.jp") and int(link.path.split("/")[-1]) == int(mpTitleId):
+                        found=True
+                        print(f"FOUND: {mpTitleId} -> {manga["id"]}")
+                        for t in title["titles"]:
+                            result[t["titleId"]] = manga["id"]
                         break
 
-                time.sleep(2)
+                if found:
+                    break
+
+                al = links.get("al")
+                if al == None:
+                    continue
+                alIds[al] = manga["id"]
+
+            alr = AnilistReq(list(alIds.keys()))["Page"]["media"]
+            for manga in alr:
+                mdexId = alIds[str(manga["id"])]
+                al = manga["externalLinks"]
+                for lnk in al:
+                    url = urlparse(lnk["url"])
+                    if (url.hostname == "mangaplus.shueisha.co.jp" and int(url.path.split("/")[-1]) == int(mpTitleId)):
+                        found=True
+                        print(f"FOUND: {mpTitleId} -> {mdexId}")
+                        for t in title["titles"]:
+                            result[t["titleId"]] = mdexId
+                        break
+                if found:
+                    break
 
             if found == False:
                 notFound[mpTitleId] = title["theTitle"]
-                print(f"Warning: {title["theTitle"]} not found, bailing")
+                print(f"WARN: {title["theTitle"]} not found")
+
+            time.sleep(2)
 
 
     except Exception as e:
