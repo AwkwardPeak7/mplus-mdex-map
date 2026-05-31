@@ -1,4 +1,5 @@
 import json
+import uuid
 import requests
 from urllib.parse import urlparse
 import time
@@ -10,7 +11,7 @@ def MangaPlusRequest(endpoint, params):
     url = f"{mangaPlusApi}{endpoint}"
     params["format"] = "json"
 
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, headers={"SESSION-TOKEN": str(uuid.uuid1())})
 
     return response.json()["success"]
 
